@@ -20,6 +20,11 @@ set -o pipefail
 
 export CWD=$(pwd)
 
+function cert_manager_deploy {
+      $KUBECTL apply -f https://github.com/cert-manager/cert-manager/releases/download/vv1.17.0/cert-manager.yaml
+      $KUBECTL -n cert-manager wait --for condition=ready pod -l app.kubernetes.io/instance=cert-manager --timeout=120s
+}
+
 function lws_deploy {
     if [ -z "$RELEASE_IMAGE_LATEST" ]; then
       echo "RELEASE_IMAGE_LATEST is empty"
@@ -38,10 +43,11 @@ function lws_deploy {
     IMAGE_TAG=$REGISTRY/$NAMESPACE/pipeline:lws
     cd $CWD/config/manager && $KUSTOMIZE edit set image controller=$IMAGE_TAG
 
+    # TODO: modify deployment command by disabling internal cert management
     # TODO: add and remove some resources. For example, remove internalcert and add certmanager and prometheus
     $KUSTOMIZE build $CWD/test/e2e/config | $KUBECTL apply --server-side -f -
 }
 
-# TODO: deploy cert manager
+cert_manager_deploy
 lws_deploy
 $GINKGO --junit-report=junit.xml --output-dir=$ARTIFACTS -v $CWD/test/e2e/...
